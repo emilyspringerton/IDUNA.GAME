@@ -29,6 +29,10 @@ const (
 	// Payload: A = 1 (success sentinel; REFLUX's own I32-only ABI has no string payload --
 	// same real constraint reflux_runtime.h's own header comment already names), B/C unused.
 	ActionDeviceLinked = 3
+	// Dispatched once this device's own Ed25519 SSH key is ready (loaded or freshly generated).
+	// Payload: A = 1 if a NEW key was just generated this run, 0 if an existing one was loaded.
+	// B/C unused. See cmd/idunagame's own sshkey.LoadOrGenerate call site.
+	ActionKeyReady = 4
 )
 
 // Action is one entry in the log -- same four-int32 shape RefluxAction (reflux_runtime.h) uses.

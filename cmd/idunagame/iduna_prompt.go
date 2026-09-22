@@ -17,9 +17,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"idunagame/internal/reflux"
+	"idunagame/internal/sshkey"
 	"idunagame/internal/vterm"
 )
 
@@ -160,9 +162,51 @@ func runIdunaPrompt(screen *vterm.Screen) {
 		}
 		screen.Write([]byte("\r\n" + solBold("LINKED") + " -- welcome, " + solGold(handle) + ".\r\n\r\n"))
 		reflux.Dispatch(reflux.ActionDeviceLinked, 1, 0, 0)
+		showDeviceKey(screen)
 		return
 	}
 	screen.Write([]byte(solMuted("Device link code expired before it was authorized -- restart idunagame to try again.\r\n")))
+}
+
+// showDeviceKey is the real, in-app affordance for generating (or loading) this device's own
+// Ed25519 SSH keypair -- founder real-time: "we need to build the affordances for me to generate
+// the keys into the shankpit client itself... we can add that to the iduna app in shankpit."
+// The keygen mechanism itself already existed (internal/sshkey, ported from PITVIPER's own
+// 2026-09-06 "the phone app will need a way to generate the key" work) but was only ever reachable
+// behind the `-ssh user@host` CLI flag in main.go -- never a real, discoverable affordance inside
+// the app itself. This surfaces it as a first-class step of IDUNA.GAME's own login sequence,
+// right after a device links, using the exact same keyPath convention main.go's own -ssh flow
+// already establishes (~/.config/idunagame/id_ed25519 on Linux, the platform-equivalent
+// UserConfigDir elsewhere) so both code paths always load/generate the same one real key --
+// never a second, divergent keypair. Same real, deliberate design sshkey's own doc comment
+// names: the PRIVATE half is generated on-device and never leaves it; only the PUBLIC line is
+// ever shown here, safe to copy/share/photograph/QR.
+func showDeviceKey(screen *vterm.Screen) {
+	cfgDir, err := os.UserConfigDir()
+	if err != nil {
+		cfgDir = "."
+	}
+	keyPath := filepath.Join(cfgDir, "idunagame", "id_ed25519")
+	pubLine, generated, err := sshkey.LoadOrGenerate(keyPath)
+	if err != nil {
+		screen.Write([]byte(solMuted(fmt.Sprintf("Could not generate a device key: %v\r\n", err))))
+		return
+	}
+	genFlag := int32(0)
+	if generated {
+		genFlag = 1
+	}
+	reflux.Dispatch(reflux.ActionKeyReady, genFlag, 0, 0)
+
+	if generated {
+		screen.Write([]byte(solBold("YOUR DEVICE KEY") + " -- generated a new one, saved to " + keyPath + "\r\n"))
+	} else {
+		screen.Write([]byte(solBold("YOUR DEVICE KEY") + " -- loaded from " + keyPath + "\r\n"))
+	}
+	screen.Write([]byte("The private half never leaves this device. Use the public line below\r\n"))
+	screen.Write([]byte("anywhere you need to authenticate as this device (e.g. as a remote\r\n"))
+	screen.Write([]byte("host's ~/.ssh/authorized_keys entry, via -ssh user@host):\r\n\r\n"))
+	screen.Write([]byte("  " + solGold(pubLine) + "\r\n\r\n"))
 }
 
 // splitLines is a tiny, dependency-free \n splitter -- honorCodeText's own real newlines, same
