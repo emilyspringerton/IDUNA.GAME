@@ -33,6 +33,10 @@ const (
 	// Payload: A = 1 if a NEW key was just generated this run, 0 if an existing one was loaded.
 	// B/C unused. See cmd/idunagame's own sshkey.LoadOrGenerate call site.
 	ActionKeyReady = 4
+	// Dispatched once this device's own GPG (OpenPGP) signing keypair is ready. Same payload
+	// shape as ActionKeyReady: A = 1 if freshly generated, 0 if loaded. See cmd/idunagame's own
+	// gpgkey.LoadOrGenerate call site.
+	ActionGpgKeyReady = 5
 )
 
 // Action is one entry in the log -- same four-int32 shape RefluxAction (reflux_runtime.h) uses.

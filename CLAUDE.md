@@ -34,9 +34,15 @@ does this).
   text and a real device code rendered in Solarized colors.
 - **REFLUX**: `internal/reflux/` — a real, native Go port of SHANKPIT's own
   `packages/reflux/reflux_runtime.c` (same ring-buffer API/ABI, ported not reinvented). Dispatches
-  `ActionHonorCodeShown`/`ActionDeviceLinkStarted`/`ActionDeviceLinked` at real milestones. No
-  subscriber exists yet — real, by design, matching REFLUX's own "dispatcher never needs to know
-  who's listening" model.
+  `ActionHonorCodeShown`/`ActionDeviceLinkStarted`/`ActionDeviceLinked`/`ActionKeyReady`/
+  `ActionGpgKeyReady` at real milestones. No subscriber exists yet — real, by design, matching
+  REFLUX's own "dispatcher never needs to know who's listening" model.
+- **Device key affordances**: right after a device links, `iduna_prompt.go` runs
+  `showDeviceKey`/`showDeviceGpgKey` — real, in-app generation of this device's own Ed25519 SSH
+  key (`internal/sshkey`, pure Go) and RSA 4096 GPG signing key (`internal/gpgkey`, shells out to
+  the real `gpg` binary — a deliberate choice over reimplementing OpenPGP, see that package's own
+  doc comment). Both only ever display the PUBLIC half; private material never leaves the device.
+  GPG generation is desktop-only (no `gpg` on Android yet) — named, not silently skipped.
 
 ## What's NOT done (named, not hidden — see NORTHSTAR.md §4)
 

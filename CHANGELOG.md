@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-22 (3)
+
+- New in-app affordance to generate/view this device's own GPG (OpenPGP) signing key (founder
+  real-time, direct follow-up to the SSH key affordance above: "now we need gpg key generation
+  same thing"). New `internal/gpgkey` — shells out to the real, already-installed `gpg` binary
+  (RSA 4096, sign-capable, no passphrase) rather than reimplementing OpenPGP in Go, into a
+  self-contained keyring (`~/.config/idunagame/gnupg`, never the caller's own default `~/.gnupg`).
+  `iduna_prompt.go`'s new `showDeviceGpgKey` runs right after `showDeviceKey`, printing the
+  real ASCII-armored public key block; private material never leaves the device, same as the SSH
+  key. Real motivating case: DEADWEIGHT's own app-release signing key (`IDUNA/docs/
+  APP_RELEASE_SIGNING.md`) exists only because someone ran a bare `gpg --gen-key` by hand once --
+  this makes producing one repeatable and in-app. New `reflux.ActionGpgKeyReady` milestone.
+  Desktop-only (no `gpg` on Android) -- named, not silently skipped. Real, live, passing test
+  against the actual gpg binary (`internal/gpgkey/gpgkey_test.go`): first run generates a fresh
+  key, second run loads the same key ID and identical public block.
+
 ## 2026-09-22 (2)
 
 - New in-app affordance to generate/view this device's own Ed25519 SSH key (founder real-time:

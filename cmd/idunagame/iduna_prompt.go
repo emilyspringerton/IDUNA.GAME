@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"idunagame/internal/gpgkey"
 	"idunagame/internal/reflux"
 	"idunagame/internal/sshkey"
 	"idunagame/internal/vterm"
@@ -163,6 +164,7 @@ func runIdunaPrompt(screen *vterm.Screen) {
 		screen.Write([]byte("\r\n" + solBold("LINKED") + " -- welcome, " + solGold(handle) + ".\r\n\r\n"))
 		reflux.Dispatch(reflux.ActionDeviceLinked, 1, 0, 0)
 		showDeviceKey(screen)
+		showDeviceGpgKey(screen, handle)
 		return
 	}
 	screen.Write([]byte(solMuted("Device link code expired before it was authorized -- restart idunagame to try again.\r\n")))
@@ -207,6 +209,55 @@ func showDeviceKey(screen *vterm.Screen) {
 	screen.Write([]byte("anywhere you need to authenticate as this device (e.g. as a remote\r\n"))
 	screen.Write([]byte("host's ~/.ssh/authorized_keys entry, via -ssh user@host):\r\n\r\n"))
 	screen.Write([]byte("  " + solGold(pubLine) + "\r\n\r\n"))
+}
+
+// showDeviceGpgKey is GPG's own real counterpart to showDeviceKey above -- founder real-time,
+// direct follow-up: "now we need gpg key generation same thing". Real, live motivating case:
+// DEADWEIGHT's own app-release signing pipeline (IDUNA/docs/APP_RELEASE_SIGNING.md) needs a real
+// RSA 4096 GPG signing key, which today only ever existed because someone ran a bare `gpg
+// --gen-key` by hand once -- this makes producing one a real, repeatable, in-app affordance
+// instead. Same real design as showDeviceKey: a self-contained keyring (never the caller's own
+// default ~/.gnupg), only the PUBLIC armored block is ever shown, and a second run loads the
+// same key rather than generating a new one every time. handle is the real, just-linked IDUNA
+// handle from the device-auth exchange -- used as the GPG identity's own uid (no real email is
+// available from that exchange response, so a synthetic-but-real, stable per-handle address is
+// used instead, same spirit as any local-identity uid that doesn't need to receive mail).
+func showDeviceGpgKey(screen *vterm.Screen, handle string) {
+	cfgDir, err := os.UserConfigDir()
+	if err != nil {
+		cfgDir = "."
+	}
+	homeDir := filepath.Join(cfgDir, "idunagame", "gnupg")
+	uid := fmt.Sprintf("%s <%s@idunagame.local>", handle, handle)
+
+	pubArmored, keyID, generated, err := gpgkey.LoadOrGenerate(homeDir, uid)
+	if err != nil {
+		if err == gpgkey.ErrGPGNotInstalled {
+			screen.Write([]byte(solMuted("No gpg binary found on this device -- GPG key generation needs " +
+				"a real GnuPG install (desktop only; not available on Android yet).\r\n\r\n")))
+			return
+		}
+		screen.Write([]byte(solMuted(fmt.Sprintf("Could not generate a GPG key: %v\r\n", err))))
+		return
+	}
+	genFlag := int32(0)
+	if generated {
+		genFlag = 1
+	}
+	reflux.Dispatch(reflux.ActionGpgKeyReady, genFlag, 0, 0)
+
+	if generated {
+		screen.Write([]byte(solBold("YOUR GPG KEY") + " -- generated a new one (RSA 4096), keyring at " + homeDir + "\r\n"))
+	} else {
+		screen.Write([]byte(solBold("YOUR GPG KEY") + " -- loaded from " + homeDir + "\r\n"))
+	}
+	screen.Write([]byte("Key ID: " + solGold(keyID) + "\r\n"))
+	screen.Write([]byte("The private half never leaves this device. Public key (paste anywhere\r\n"))
+	screen.Write([]byte("you need to publish/verify signatures, e.g. a GitHub Actions secret):\r\n\r\n"))
+	for _, line := range splitLines(pubArmored) {
+		screen.Write([]byte("  " + line + "\r\n"))
+	}
+	screen.Write([]byte("\r\n"))
 }
 
 // splitLines is a tiny, dependency-free \n splitter -- honorCodeText's own real newlines, same
